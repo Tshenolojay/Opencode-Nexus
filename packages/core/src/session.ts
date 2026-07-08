@@ -1,7 +1,7 @@
 export * as SessionV2 from "./session"
 export * from "./session/schema"
 
-import { DateTime, Effect, Layer, Schema, Context, Stream } from "effect"
+import { DateTime, Effect, Layer, Schema, Context, Stream, Option, pipe } from "effect"
 import { ListAnchor } from "@opencode-ai/schema/session"
 import { and, asc, desc, eq, gt, like, lt, or, type SQL } from "drizzle-orm"
 import { ProjectV2 } from "./project"
@@ -33,6 +33,8 @@ import { MessageDecodeError } from "./session/error"
 import { SessionEvent } from "./session/event"
 import { SessionInput } from "./session/input"
 import { Snapshot } from "./snapshot"
+import { Flag } from "./flag/flag"
+import { SessionIntegration } from "@opencode-ai/orchestrator"
 import { SessionRevert } from "./session/revert"
 import { Revert } from "@opencode-ai/schema/revert"
 import { FSUtil } from "./fs-util"
@@ -380,6 +382,34 @@ const layer = Layer.effect(
             if (!SessionInput.equivalent(admitted, expected))
               return yield* new PromptConflictError({ sessionID: input.sessionID, messageID })
             if (input.resume !== false) yield* execution.wake(admitted.sessionID)
+            if (!Flag.OPENCODE_DISABLE_ORCHESTRATOR) {
+              yield* pipe(
+                Effect.serviceOption(SessionIntegration.Service),
+                Effect.flatMap(
+                  Option.match({
+                    onNone: () => Effect.void,
+                    onSome: (service) =>
+                      pipe(
+                        service.integrate({
+                          promptText: prompt,
+                          sessionID: input.sessionID,
+                          filesAttached: false,
+                          conversationLength: 0,
+                          repositorySize: 0,
+                          contextAvailable: false,
+                          previousToolResults: false,
+                          sessionMetadata: undefined,
+                          assistantResponses: undefined,
+                          toolResults: undefined,
+                          projectInfo: undefined,
+                        }),
+                        Effect.option,
+                        Effect.asVoid,
+                      ),
+                  }),
+                ),
+              )
+            }
             return admitted
           }),
         ),

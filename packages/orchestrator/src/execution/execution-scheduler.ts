@@ -1,0 +1,134 @@
+export * as ExecutionScheduler from "./execution-scheduler"
+
+import { Context, Effect, Layer } from "effect"
+import type { Graph, GraphNode } from "../planner/execution-graph"
+import type { PlanningPolicy } from "../planner/planning-policy"
+import type { KnowledgePlan } from "../planner/knowledge-planner"
+import type { CapabilityPlan } from "../planner/capability-planner"
+import { SpecialistRegistry } from "../specialists/registry"
+
+export interface ScheduleBatch {
+  readonly index: number
+  readonly nodeIDs: readonly string[]
+  readonly parallel: boolean
+}
+
+export interface Schedule {
+  readonly batches: readonly ScheduleBatch[]
+  readonly totalBatches: number
+  readonly estimatedDurationMs: number
+}
+
+export interface ScheduleInput {
+  readonly graph: Graph
+  readonly policy: PlanningPolicy
+  readonly capabilityPlan: CapabilityPlan
+  readonly knowledgePlan: KnowledgePlan | undefined
+  readonly repositorySize: number
+}
+
+export interface Interface {
+  readonly schedule: (input: ScheduleInput) => Effect.Effect<Schedule>
+}
+
+export class Service extends Context.Service<Service, Interface>()("@opencode/orchestrator/ExecutionScheduler") {}
+
+function dependsOn(graph: Graph, node: GraphNode, other: GraphNode): boolean {
+  return graph.edges.some((e) => e.from === other.id && e.to === node.id && (e.kind === "depends-on" || e.kind === "sequential"))
+}
+
+const schedule: Interface["schedule"] = Effect.fn("ExecutionScheduler.schedule")(function* (input) {
+  const { graph, policy, repositorySize } = input
+  const registry = yield* SpecialistRegistry.Service
+  const allProfiles = yield* registry.getAll()
+  const specialistNodes = graph.nodes.filter((n) => n.type === "specialist")
+
+  if (specialistNodes.length === 0) {
+    return { batches: [], totalBatches: 0, estimatedDurationMs: 0 }
+  }
+
+  const contractMap = new Map<string, { requires: readonly string[]; produces: readonly string[] }>()
+  for (const profile of allProfiles) {
+    contractMap.set(profile.id, { requires: profile.contract.requires, produces: profile.contract.produces })
+  }
+
+  const producedBy = new Map<string, string>()
+  for (const node of specialistNodes) {
+    const contract = contractMap.get(node.id)
+    if (contract) {
+      for (const p of contract.produces) {
+        producedBy.set(p, node.id)
+      }
+    }
+  }
+
+  const maxParallel = policy.maxSpecialists > 0 ? Math.min(policy.maxSpecialists, 4) : 1
+  const batches: ScheduleBatch[] = []
+  const scheduled = new Set<string>()
+  let index = 0
+
+  while (scheduled.size < specialistNodes.length) {
+    const ready = specialistNodes.filter((n) => {
+      if (scheduled.has(n.id)) return false
+
+      const contract = contractMap.get(n.id)
+      if (!contract || contract.requires.length === 0) return true
+
+      return contract.requires.every((req) => {
+        const producer = producedBy.get(req)
+        return !producer || scheduled.has(producer)
+      })
+    })
+
+    if (ready.length === 0) break
+
+    if (ready.length > 1 && maxParallel >= 2) {
+      const parallelGroup: string[] = []
+      for (const node of ready) {
+        if (parallelGroup.length >= maxParallel) break
+        const contract = contractMap.get(node.id)
+        const dependsOnGroup = contract
+          ? contract.requires.some((req) => {
+              const producer = producedBy.get(req)
+              return producer !== undefined && parallelGroup.includes(producer)
+            })
+          : false
+        if (!dependsOnGroup) {
+          parallelGroup.push(node.id)
+        }
+      }
+      if (parallelGroup.length > 0) {
+        batches.push({ index, nodeIDs: parallelGroup, parallel: parallelGroup.length > 1 })
+        parallelGroup.forEach((id) => scheduled.add(id))
+      } else {
+        batches.push({ index, nodeIDs: [ready[0].id], parallel: false })
+        scheduled.add(ready[0].id)
+      }
+    } else {
+      batches.push({ index, nodeIDs: [ready[0].id], parallel: false })
+      scheduled.add(ready[0].id)
+    }
+    index++
+  }
+
+  const estimatedDurationMs = batches.reduce((acc, b) => {
+    const nodes = b.nodeIDs.map((id) => graph.nodes.find((n) => n.id === id)).filter(Boolean) as GraphNode[]
+    const maxInBatch = nodes.reduce((m, n) => Math.max(m, n.estimatedDurationMs), 0)
+    return acc + maxInBatch
+  }, 0)
+
+  if (repositorySize > 5000) {
+    return { batches, totalBatches: batches.length, estimatedDurationMs: estimatedDurationMs * 1.2 }
+  }
+
+  return { batches, totalBatches: batches.length, estimatedDurationMs }
+})
+
+const layer = Layer.effect(
+  Service,
+  Effect.gen(function* () {
+    return Service.of({ schedule })
+  }),
+)
+
+export { layer }

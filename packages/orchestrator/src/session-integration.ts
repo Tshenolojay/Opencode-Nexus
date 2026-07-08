@@ -1,0 +1,164 @@
+export * as SessionIntegration from "./session-integration"
+
+import { Effect } from "effect"
+import type { ExecutionDecision } from "./contracts/execution-decision"
+import type { ExecutionPackage } from "./integration/execution-package"
+import { OrchestratorService } from "./orchestrator"
+import type { PhaseEntry } from "./orchestrator"
+
+/**
+ * Sole orchestration entry point.
+ *
+ * Plumbed before SessionRunner.run():
+ *   yield* SessionIntegration.decide({ promptText, sessionID, ... })
+ *
+ * Produces an ExecutionDecision. When continueNormally is true the
+ * SessionRunner executes exactly as today — the orchestrator is
+ * completely transparent.
+ */
+
+export interface IntegrationInput {
+  readonly promptText: string
+  readonly sessionID: string
+  readonly filesAttached: boolean
+  readonly conversationLength: number
+  readonly repositorySize: number
+  readonly contextAvailable: boolean
+  readonly previousToolResults: boolean
+  readonly sessionMetadata: Record<string, string> | undefined
+  readonly assistantResponses: readonly string[] | undefined
+  readonly toolResults: readonly string[] | undefined
+  readonly projectInfo: string | undefined
+}
+
+export interface IntegrationResult {
+  readonly decision: ExecutionDecision
+  readonly shouldBypass: boolean
+}
+
+export interface Interface {
+  readonly decide: (input: IntegrationInput) => Effect.Effect<IntegrationResult>
+  readonly bypass: (input: IntegrationInput) => Effect.Effect<IntegrationResult>
+  readonly integrate: (input: IntegrationInput) => Effect.Effect<ExecutionPackage>
+}
+
+function buildSummary(diagnostics: readonly PhaseEntry[]): {
+  readonly totalPlanningTimeMs: number
+  readonly phasesCompleted: readonly string[]
+} {
+  return {
+    totalPlanningTimeMs: diagnostics.reduce((acc, e) => acc + e.durationMs, 0),
+    phasesCompleted: diagnostics.map((e) => e.phase),
+  }
+}
+
+export class Service extends Effect.Service<Service>()("@opencode/orchestrator/SessionIntegration", {
+  effect: Effect.gen(function* () {
+    const orchestrator = yield* OrchestratorService.Service
+
+    const decide = Effect.fn("SessionIntegration.decide")(function* (input: IntegrationInput): Effect.Effect<IntegrationResult> {
+      const { decision, timing, diagnostics: entries } = yield* orchestrator.orchestrateWithContext({
+        promptText: input.promptText,
+        sessionID: input.sessionID,
+        filesAttached: input.filesAttached,
+        conversationLength: input.conversationLength,
+        repositorySize: input.repositorySize,
+        contextAvailable: input.contextAvailable,
+        previousToolResults: input.previousToolResults,
+        sessionMetadata: input.sessionMetadata,
+        assistantResponses: input.assistantResponses,
+        toolResults: input.toolResults,
+        projectInfo: input.projectInfo,
+      })
+
+      const summary = buildSummary(entries)
+
+      const executionDecision: ExecutionDecision = {
+        needsOrchestration: decision.needsOrchestration,
+        continueNormally: decision.confidence === "high",
+        decision,
+        confidenceScore: decision.confidenceScore,
+        selectedCapabilities: decision.selectedCapabilities,
+        dispatchPlan: decision.dispatchPlan,
+        knowledgeRequirements: decision.knowledgeRequirements,
+        executionNotes: decision.executionNotes,
+        diagnostics: {
+          taskType: decision.taskClassification?.type,
+          confidence: decision.confidence,
+          confidenceScore: decision.confidenceScore?.score,
+          capabilities: decision.selectedCapabilities ?? [],
+          requiredAgents: decision.dispatchPlan.requiredAgents,
+          estimatedSpecialists: decision.dispatchPlan.requiredAgents.length,
+          requiresFurtherPlanning: decision.dispatchPlan.requiredAgents.length > 0,
+          totalPlanningTimeMs: summary.totalPlanningTimeMs,
+          phasesCompleted: summary.phasesCompleted,
+        },
+        timing,
+      }
+
+      return { decision: executionDecision, shouldBypass: executionDecision.continueNormally }
+    })
+
+    const integrate = Effect.fn("SessionIntegration.integrate")(function* (input: IntegrationInput): Effect.Effect<ExecutionPackage> {
+      const { executionPackage } = yield* orchestrator.orchestrateWithContext({
+        promptText: input.promptText,
+        sessionID: input.sessionID,
+        filesAttached: input.filesAttached,
+        conversationLength: input.conversationLength,
+        repositorySize: input.repositorySize,
+        contextAvailable: input.contextAvailable,
+        previousToolResults: input.previousToolResults,
+        sessionMetadata: input.sessionMetadata,
+        assistantResponses: input.assistantResponses,
+        toolResults: input.toolResults,
+        projectInfo: input.projectInfo,
+      })
+      return executionPackage
+    })
+
+    const bypass = Effect.fn("SessionIntegration.bypass")(function* (input: IntegrationInput): Effect.Effect<IntegrationResult> {
+      const decision = yield* orchestrator.skip({
+        promptText: input.promptText,
+        sessionID: input.sessionID,
+        filesAttached: input.filesAttached,
+        conversationLength: input.conversationLength,
+        repositorySize: input.repositorySize,
+        contextAvailable: input.contextAvailable,
+        previousToolResults: input.previousToolResults,
+        sessionMetadata: undefined,
+        assistantResponses: undefined,
+        toolResults: undefined,
+        projectInfo: undefined,
+      })
+
+      const executionDecision: ExecutionDecision = {
+        needsOrchestration: false,
+        continueNormally: true,
+        decision,
+        confidenceScore: undefined,
+        selectedCapabilities: undefined,
+        dispatchPlan: decision.dispatchPlan,
+        knowledgeRequirements: undefined,
+        executionNotes: undefined,
+        diagnostics: {
+          taskType: undefined,
+          confidence: "high",
+          confidenceScore: undefined,
+          capabilities: [],
+          requiredAgents: [],
+          estimatedSpecialists: 0,
+          requiresFurtherPlanning: false,
+          totalPlanningTimeMs: 0,
+          phasesCompleted: ["bypass"],
+        },
+        timing: undefined,
+      }
+
+      return { decision: executionDecision, shouldBypass: true }
+    })
+
+    return Service.of({ decide, bypass, integrate })
+  }),
+}) {}
+
+export const layer = Service.Default
