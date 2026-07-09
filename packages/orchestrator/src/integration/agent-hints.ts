@@ -13,6 +13,11 @@ export type HintTag =
   | "dependency-risk"
   | "long-context"
   | "planning-intensive"
+  | "execution-risk"
+  | "missing-verification"
+  | "tool-advice-available"
+  | "context-compressed"
+  | "specialist-consensus"
 
 export interface AgentHints {
   readonly hints: readonly HintTag[]
@@ -50,6 +55,15 @@ const generate: Interface["generate"] = Effect.fn("AgentHints.generate")(functio
   if (pkg.taskClassification.type === "refactor" || pkg.taskClassification.type === "architecture") {
     hints.push("large-refactor")
   }
+
+  const intel = pkg.executionIntelligence
+  if (intel?.executionRisks && intel.executionRisks.length > 0) hints.push("execution-risk")
+  if (pkg.taskClassification.requiresVerification && (intel?.executionConstraints?.some((c) => c.type === "hard") ?? false)) {
+    hints.push("missing-verification")
+  }
+  if (intel?.toolAdvice && intel.toolAdvice.suggestedTools.length > 0) hints.push("tool-advice-available")
+  if (pkg.compressedContext) hints.push("context-compressed")
+  if (pkg.specialistConsensus) hints.push("specialist-consensus")
 
   const reason = hints.length > 0
     ? `Detected: ${hints.join(", ")}`

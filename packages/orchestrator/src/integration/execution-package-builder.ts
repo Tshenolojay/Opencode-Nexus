@@ -38,32 +38,33 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()("@opencode/orchestrator/ExecutionPackageBuilder") {}
 
 const build: Interface["build"] = Effect.fn("ExecutionPackageBuilder.build")(function* (input) {
-  const pkg = emptyPackage(input.sessionID)
+  const pkg = emptyPackage(input.sessionID) as unknown as Record<string, unknown>
+  const src = input as unknown as Record<string, unknown>
 
-  pkg.taskClassification = input.taskClassification
-  pkg.classifications = input.classifications
-  pkg.confidence = input.confidence
-  pkg.confidenceScore = input.confidenceScore
-  pkg.capabilityPlan = input.capabilityPlan
-  pkg.specialistPlan = input.specialistPlan
-  pkg.knowledgePlan = input.knowledgePlan
-  pkg.dispatchPlan = input.dispatchPlan
-  pkg.planningPolicy = input.planningPolicy
-  pkg.executionGraph = input.executionGraph
-  pkg.knowledgeBundle = input.knowledgeBundle
-  pkg.repositoryIntelligence = input.repositoryIntelligence
-  pkg.dependencyIntelligence = input.dependencyIntelligence
-  pkg.architectureIntelligence = input.architectureIntelligence
-  pkg.documentationIntelligence = input.documentationIntelligence
-  pkg.verificationIntelligence = input.verificationIntelligence
-  pkg.contextIntelligence = input.contextIntelligence
-  pkg.runtimeMetrics = input.runtimeMetrics
-  pkg.executionNotes = input.executionNotes
+  pkg.taskClassification = src.taskClassification
+  pkg.classifications = src.classifications
+  pkg.confidence = src.confidence
+  pkg.confidenceScore = src.confidenceScore
+  pkg.capabilityPlan = src.capabilityPlan
+  pkg.specialistPlan = src.specialistPlan
+  pkg.knowledgePlan = src.knowledgePlan
+  pkg.dispatchPlan = src.dispatchPlan
+  pkg.planningPolicy = src.planningPolicy
+  pkg.executionGraph = src.executionGraph
+  pkg.knowledgeBundle = src.knowledgeBundle
+  pkg.repositoryIntelligence = src.repositoryIntelligence
+  pkg.dependencyIntelligence = src.dependencyIntelligence
+  pkg.architectureIntelligence = src.architectureIntelligence
+  pkg.documentationIntelligence = src.documentationIntelligence
+  pkg.verificationIntelligence = src.verificationIntelligence
+  pkg.contextIntelligence = src.contextIntelligence
+  pkg.runtimeMetrics = src.runtimeMetrics
+  pkg.executionNotes = src.executionNotes
 
   pkg.conversationSummary = input.knowledgeBundle.conversationSummary
   pkg.modelRecommendation = input.capabilityPlan?.reason
 
-  return pkg
+  return pkg as unknown as ExecutionPackage
 })
 
 const layer = Layer.effect(

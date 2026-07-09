@@ -4,6 +4,65 @@ export interface SpecialistContract {
   readonly requires: readonly string[]
   readonly consumes: readonly string[]
   readonly produces: readonly string[]
+  readonly provides: readonly string[]
+  readonly validates: readonly string[]
+  readonly reviews: readonly string[]
+  readonly approves: readonly string[]
+  readonly dependsOn: readonly string[]
+  readonly canExecuteInParallel: boolean
+  readonly canExecuteSequentially: boolean
+  readonly canSkip: boolean
+  readonly canReuse: boolean
+  readonly canRetry: boolean
+  readonly canEscalate: boolean
+}
+
+export interface SpecialistLifecycle {
+  readonly planning: readonly string[]
+  readonly preparation: readonly string[]
+  readonly execution: readonly string[]
+  readonly validation: readonly string[]
+  readonly knowledgeProduction: readonly string[]
+  readonly review: readonly string[]
+  readonly completion: readonly string[]
+  readonly reuse: readonly string[]
+  readonly recovery: readonly string[]
+  readonly cancellation: readonly string[]
+  readonly failure: readonly string[]
+  readonly timeout: readonly string[]
+}
+
+export interface SpecialistDecisionRules {
+  readonly canRecommendContinue: boolean
+  readonly canRecommendRetry: boolean
+  readonly canRecommendEscalate: boolean
+  readonly canRecommendStop: boolean
+  readonly canRecommendCollectMoreKnowledge: boolean
+  readonly canRecommendReduceContext: boolean
+  readonly canRecommendExpandContext: boolean
+  readonly canRecommendRunVerification: boolean
+  readonly canRecommendRunDocumentationReview: boolean
+  readonly canRecommendRunArchitectureReview: boolean
+  readonly canRecommendRunDependencyReview: boolean
+  readonly canRecommendRunSearch: boolean
+  readonly canRecommendRunPlanning: boolean
+}
+
+export interface SpecialistModelRequirements {
+  readonly preferredReasoningModel: string | undefined
+  readonly preferredSearchModel: string | undefined
+  readonly preferredLongContextModel: string | undefined
+  readonly preferredFastModel: string | undefined
+  readonly preferredCheapModel: string | undefined
+  readonly preferredMultimodalModel: string | undefined
+  readonly preferredLatencyMs: number | undefined
+  readonly preferredCostPerToken: number | undefined
+  readonly preferredQualityScore: number | undefined
+  readonly preferredContextTokens: number | undefined
+  readonly requiresStreaming: boolean | undefined
+  readonly requiresVerification: boolean | undefined
+  readonly requiresSearch: boolean | undefined
+  readonly requiresPlanning: boolean | undefined
 }
 
 export interface SpecialistProfile {
@@ -11,116 +70,66 @@ export interface SpecialistProfile {
   readonly name: string
   readonly description: string
   readonly purpose: string
+  readonly mission: string | undefined
+  readonly primaryObjective: string | undefined
+  readonly responsibilities: string | undefined
   readonly requiredCapabilities: readonly string[]
   readonly preferredKnowledge: readonly string[]
+  readonly knowledgeSources: readonly string[] | undefined
   readonly executionPriority: number
   readonly supportsParallelExecution: boolean
   readonly contract: SpecialistContract
+  readonly lifecycle: SpecialistLifecycle | undefined
+  readonly decisionRules: SpecialistDecisionRules | undefined
+  readonly modelRequirements: SpecialistModelRequirements | undefined
+  readonly expertise: readonly string[] | undefined
+  readonly produces: readonly string[] | undefined
+  readonly consumes: readonly string[] | undefined
+  readonly requires: readonly string[] | undefined
+  readonly preferredCapabilities: readonly string[] | undefined
+  readonly optionalCapabilities: readonly string[] | undefined
+  readonly secondaryCapabilities: readonly string[] | undefined
+  readonly fallbackCapabilities: readonly string[] | undefined
+  readonly specialistStrengths: readonly string[] | undefined
+  readonly specialistWeaknesses: readonly string[] | undefined
+  readonly specialistPreferences: readonly string[] | undefined
+  readonly maximumContext: number | undefined
+  readonly priorityWeight: number | undefined
+  readonly confidenceWeight: number | undefined
+  readonly executionCost: number | undefined
+  readonly expectedRuntimeMs: number | undefined
+  readonly recoveryStrategy: string | undefined
+  readonly retryPolicy: string | undefined
+  readonly timeoutPolicy: string | undefined
+  readonly maxRetries: number | undefined
+  readonly timeoutMs: number | undefined
+  readonly reviewRequirements: readonly string[] | undefined
+  readonly reviewResponsibilities: readonly string[] | undefined
+  readonly approvalRequirements: readonly string[] | undefined
+  readonly memoryRequirements: readonly string[] | undefined
+  readonly cachePolicy: string | undefined
+  readonly collaborationRules: readonly string[] | undefined
+  readonly validationRules: readonly string[] | undefined
+  readonly metrics: readonly string[] | undefined
+  readonly diagnostics: readonly string[] | undefined
 }
 
-export const SearchSpecialist: SpecialistProfile = {
-  id: "specialist/search",
-  name: "Search Specialist",
-  description: "Searches the codebase for relevant files, symbols, and patterns",
-  purpose: "Find relevant code and documentation during discovery phase",
-  requiredCapabilities: ["search", "repository-understanding"],
-  preferredKnowledge: ["repository-summary", "relevant-files", "search-results", "project-structure"],
-  executionPriority: 2,
-  supportsParallelExecution: true,
-  contract: { requires: ["repository-understanding"], consumes: ["search-query"], produces: ["search-results", "relevant-files"] },
-}
-
-export const RepositorySpecialist: SpecialistProfile = {
-  id: "specialist/repository",
-  name: "Repository Specialist",
-  description: "Analyzes repository structure, project layout, and code organization",
-  purpose: "Understand the overall repository before detailed work",
-  requiredCapabilities: ["repository-understanding", "analysis"],
-  preferredKnowledge: ["repository-summary", "project-structure", "architecture-summary", "relevant-files"],
-  executionPriority: 1,
-  supportsParallelExecution: false,
-  contract: { requires: ["repository-understanding"], consumes: ["project-path"], produces: ["repository-summary", "project-structure"] },
-}
-
-export const DependencySpecialist: SpecialistProfile = {
-  id: "specialist/dependency",
-  name: "Dependency Specialist",
-  description: "Analyzes project dependencies, imports, and module relationships",
-  purpose: "Understand dependency graph and module interactions",
-  requiredCapabilities: ["search", "analysis"],
-  preferredKnowledge: ["dependency-graph", "project-structure", "configuration"],
-  executionPriority: 3,
-  supportsParallelExecution: true,
-  contract: { requires: ["search"], consumes: ["project-structure"], produces: ["dependency-graph", "dependencies"] },
-}
-
-export const DocumentationSpecialist: SpecialistProfile = {
-  id: "specialist/documentation",
-  name: "Documentation Specialist",
-  description: "Reads and summarizes documentation, comments, and README files",
-  purpose: "Gather documentation context for the task",
-  requiredCapabilities: ["search", "long-context"],
-  preferredKnowledge: ["documentation", "repository-summary", "external-references"],
-  executionPriority: 4,
-  supportsParallelExecution: true,
-  contract: { requires: ["search"], consumes: ["search-results"], produces: ["documentation", "external-references"] },
-}
-
-export const ArchitectureSpecialist: SpecialistProfile = {
-  id: "specialist/architecture",
-  name: "Architecture Specialist",
-  description: "Analyzes system architecture, component relationships, and design patterns",
-  purpose: "Understand the architectural context before making changes",
-  requiredCapabilities: ["repository-understanding", "analysis", "reasoning"],
-  preferredKnowledge: ["architecture-summary", "repository-summary", "dependency-graph", "conversation-summary"],
-  executionPriority: 2,
-  supportsParallelExecution: false,
-  contract: { requires: ["repository-understanding", "analysis"], consumes: ["repository-summary", "dependency-graph"], produces: ["architecture-summary", "architecture-notes"] },
-}
-
-export const VerificationSpecialist: SpecialistProfile = {
-  id: "specialist/verification",
-  name: "Verification Specialist",
-  description: "Verifies correctness of code changes, runs validation checks",
-  purpose: "Ensure task requirements are met and no regressions introduced",
-  requiredCapabilities: ["analysis", "tool-use", "code-generation"],
-  preferredKnowledge: ["verification-targets", "relevant-files", "execution-notes"],
-  executionPriority: 6,
-  supportsParallelExecution: false,
-  contract: { requires: ["analysis", "code-generation"], consumes: ["relevant-files", "execution-notes"], produces: ["verification-results", "verification-notes"] },
-}
-
-export const ContextSpecialist: SpecialistProfile = {
-  id: "specialist/context",
-  name: "Context Specialist",
-  description: "Manages context windows, summarizes conversation history, and optimizes prompt assembly",
-  purpose: "Prepare optimal context for the primary model",
-  requiredCapabilities: ["long-context", "reasoning", "analysis"],
-  preferredKnowledge: ["conversation-summary", "tool-history", "repository-summary", "architecture-summary"],
-  executionPriority: 4,
-  supportsParallelExecution: false,
-  contract: { requires: ["long-context", "reasoning"], consumes: ["conversation-history", "tool-history"], produces: ["context-summary", "conversation-summary"] },
-}
-
-export const PlanningSpecialist: SpecialistProfile = {
-  id: "specialist/planning",
-  name: "Planning Specialist",
-  description: "Breaks down complex tasks into sub-tasks and plans execution order",
-  purpose: "Create execution plan for multi-step tasks",
-  requiredCapabilities: ["planning", "reasoning", "analysis"],
-  preferredKnowledge: ["repository-summary", "architecture-summary", "relevant-files", "conversation-summary"],
-  executionPriority: 1,
-  supportsParallelExecution: false,
-  contract: { requires: ["planning", "reasoning"], consumes: ["repository-summary", "architecture-summary"], produces: ["execution-plan", "task-breakdown"] },
-}
+import { profile as SearchProfile } from "./search-specialist"
+import { profile as RepositoryProfile } from "./repository-specialist"
+import { profile as DependencyProfile } from "./dependency-specialist"
+import { profile as DocumentationProfile } from "./documentation-specialist"
+import { profile as ArchitectureProfile } from "./architecture-specialist"
+import { profile as VerificationProfile } from "./verification-specialist"
+import { profile as ContextProfile } from "./context-specialist"
+import { profile as PlanningProfile } from "./planning-specialist"
 
 export const DefaultSpecialists: readonly SpecialistProfile[] = [
-  SearchSpecialist,
-  RepositorySpecialist,
-  DependencySpecialist,
-  DocumentationSpecialist,
-  ArchitectureSpecialist,
-  VerificationSpecialist,
-  ContextSpecialist,
-  PlanningSpecialist,
+  SearchProfile,
+  RepositoryProfile,
+  DependencyProfile,
+  DocumentationProfile,
+  ArchitectureProfile,
+  VerificationProfile,
+  ContextProfile,
+  PlanningProfile,
 ]

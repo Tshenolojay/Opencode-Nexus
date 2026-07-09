@@ -1,0 +1,8 @@
+export { VirtualTeam } from "./virtual-team"
+export { TaskDecomposer } from "./task-decomposer"
+export { WorkAllocationEngine } from "./work-allocation"
+export { TeamCoordinator } from "./team-coordinator"
+export { TeamWorkspace } from "./workspace"
+export { TeamDiscussionEngine } from "./team-discussion"
+export { ReviewPipeline } from "./review-pipeline"
+export { CapabilityMarketplace } from "./capability-marketplace"

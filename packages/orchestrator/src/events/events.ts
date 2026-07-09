@@ -160,6 +160,452 @@ export const ExecutionCompleted = Event.define({
   },
 })
 
+export const ExecutionAdvised = Event.define({
+  type: "orchestrator.execution-advised",
+  schema: {
+    sessionID: Schema.String,
+    riskCount: Schema.Finite,
+    recommendationCount: Schema.Finite,
+    executionPriority: Schema.String,
+  },
+})
+
+export const ExecutionOptimized = Event.define({
+  type: "orchestrator.execution-optimized",
+  schema: {
+    sessionID: Schema.String,
+    savedBytes: Schema.Finite,
+    removedDuplicates: Schema.Finite,
+  },
+})
+
+export const PromptEnhanced = Event.define({
+  type: "orchestrator.prompt-enhanced",
+  schema: {
+    sessionID: Schema.String,
+    sections: Schema.Array(Schema.String),
+    augmentationLength: Schema.Finite,
+  },
+})
+
+export const ToolAdviceGenerated = Event.define({
+  type: "orchestrator.tool-advice-generated",
+  schema: {
+    sessionID: Schema.String,
+    suggestedTools: Schema.Array(Schema.String),
+    avoidTools: Schema.Array(Schema.String),
+  },
+})
+
+export const KnowledgeCompressed = Event.define({
+  type: "orchestrator.knowledge-compressed",
+  schema: {
+    sessionID: Schema.String,
+    originalSize: Schema.Finite,
+    compressedSize: Schema.Finite,
+  },
+})
+
+export const KnowledgeReused = Event.define({
+  type: "orchestrator.knowledge-reused",
+  schema: {
+    sessionID: Schema.String,
+    reusedSummaryCount: Schema.Finite,
+    savingsBytes: Schema.Finite,
+  },
+})
+
+export const ExecutionPackageEnhanced = Event.define({
+  type: "orchestrator.execution-package-enhanced",
+  schema: {
+    sessionID: Schema.String,
+    hasExecutionIntelligence: Schema.Boolean,
+    hasCompressedContext: Schema.Boolean,
+  },
+})
+
+export const WorkflowRecommended = Event.define({
+  type: "orchestrator.workflow-recommended",
+  schema: {
+    sessionID: Schema.String,
+    workflow: Schema.String,
+  },
+})
+
+export const ReasoningBuilt = Event.define({
+  type: "orchestrator.reasoning-built",
+  schema: {
+    sessionID: Schema.String,
+    narrativeLength: Schema.Finite,
+    consensus: Schema.String,
+  },
+})
+
+export const ConsensusGenerated = Event.define({
+  type: "orchestrator.consensus-generated",
+  schema: {
+    sessionID: Schema.String,
+    overallConsensus: Schema.String,
+    overallConfidence: Schema.Finite,
+    agreements: Schema.Finite,
+    disagreements: Schema.Finite,
+  },
+})
+
+export const NarrativeGenerated = Event.define({
+  type: "orchestrator.narrative-generated",
+  schema: {
+    sessionID: Schema.String,
+    sections: Schema.Finite,
+    fullTextLength: Schema.Finite,
+  },
+})
+
+export const DecisionGenerated = Event.define({
+  type: "orchestrator.decision-generated",
+  schema: {
+    sessionID: Schema.String,
+    decisions: Schema.Finite,
+    showVerificationAdvice: Schema.Boolean,
+  },
+})
+
+export const ReasoningReused = Event.define({
+  type: "orchestrator.reasoning-reused",
+  schema: {
+    sessionID: Schema.String,
+    reuseCount: Schema.Finite,
+  },
+})
+
+export const ReasoningCompressed = Event.define({
+  type: "orchestrator.reasoning-compressed",
+  schema: {
+    sessionID: Schema.String,
+    originalSize: Schema.Finite,
+    compressedSize: Schema.Finite,
+  },
+})
+
+export const NarrativeUpdated = Event.define({
+  type: "orchestrator.narrative-updated",
+  schema: {
+    sessionID: Schema.String,
+    updatedSections: Schema.Finite,
+  },
+})
+
+export const TeamCreated = Event.define({
+  type: "orchestrator.team-created",
+  schema: {
+    sessionID: Schema.String,
+    teamSize: Schema.Finite,
+    activeMembers: Schema.Finite,
+  },
+})
+
+export const TasksDecomposed = Event.define({
+  type: "orchestrator.tasks-decomposed",
+  schema: {
+    sessionID: Schema.String,
+    taskCount: Schema.Finite,
+    estimatedComplexity: Schema.Finite,
+  },
+})
+
+export const WorkAllocated = Event.define({
+  type: "orchestrator.work-allocated",
+  schema: {
+    sessionID: Schema.String,
+    assignmentCount: Schema.Finite,
+    priority: Schema.String,
+  },
+})
+
+export const WorkspaceUpdated = Event.define({
+  type: "orchestrator.workspace-updated",
+  schema: {
+    sessionID: Schema.String,
+    workspaceCount: Schema.Finite,
+  },
+})
+
+export const TeamDiscussionBuilt = Event.define({
+  type: "orchestrator.team-discussion-built",
+  schema: {
+    sessionID: Schema.String,
+    agreements: Schema.Finite,
+    disagreements: Schema.Finite,
+  },
+})
+
+export const ReviewCompleted = Event.define({
+  type: "orchestrator.review-completed",
+  schema: {
+    sessionID: Schema.String,
+    stagesCompleted: Schema.Finite,
+    totalStages: Schema.Finite,
+  },
+})
+
+export const CapabilityAdvertised = Event.define({
+  type: "orchestrator.capability-advertised",
+  schema: {
+    sessionID: Schema.String,
+    advertisements: Schema.Finite,
+  },
+})
+
+export const CollaborationCompleted = Event.define({
+  type: "orchestrator.collaboration-completed",
+  schema: {
+    sessionID: Schema.String,
+    teamPlanCreated: Schema.Boolean,
+  },
+})
+
+export const ConnectorRegistered = Event.define({
+  type: "orchestrator.connector-registered",
+  schema: {
+    sessionID: Schema.String,
+    sourceType: Schema.String,
+    enabled: Schema.Boolean,
+  },
+})
+
+export const ConnectorRequested = Event.define({
+  type: "orchestrator.connector-requested",
+  schema: {
+    sessionID: Schema.String,
+    requestCount: Schema.Finite,
+    hasRequired: Schema.Boolean,
+  },
+})
+
+export const ConnectorPrepared = Event.define({
+  type: "orchestrator.connector-prepared",
+  schema: {
+    sessionID: Schema.String,
+    sourceType: Schema.String,
+    status: Schema.String,
+  },
+})
+
+export const ConnectorReused = Event.define({
+  type: "orchestrator.connector-reused",
+  schema: {
+    sessionID: Schema.String,
+    reuseCount: Schema.Finite,
+  },
+})
+
+export const ConnectorCompleted = Event.define({
+  type: "orchestrator.connector-completed",
+  schema: {
+    sessionID: Schema.String,
+    totalConnectors: Schema.Finite,
+    preparedCount: Schema.Finite,
+    skippedCount: Schema.Finite,
+  },
+})
+
+export const KnowledgeSourceDiscovered = Event.define({
+  type: "orchestrator.knowledge-source-discovered",
+  schema: {
+    sessionID: Schema.String,
+    discoveredTypes: Schema.Finite,
+  },
+})
+
+export const ConnectorCacheHit = Event.define({
+  type: "orchestrator.connector-cache-hit",
+  schema: {
+    sessionID: Schema.String,
+    sourceType: Schema.String,
+  },
+})
+
+export const ConnectorCacheMiss = Event.define({
+  type: "orchestrator.connector-cache-miss",
+  schema: {
+    sessionID: Schema.String,
+    sourceType: Schema.String,
+  },
+})
+
+export const SpecialistRegistered = Event.define({
+  type: "orchestrator.specialist-registered",
+  schema: {
+    sessionID: Schema.String,
+    specialistID: Schema.String,
+    specialistName: Schema.String,
+  },
+})
+
+export const SpecialistActivated = Event.define({
+  type: "orchestrator.specialist-activated",
+  schema: {
+    sessionID: Schema.String,
+    specialistID: Schema.String,
+    taskType: Schema.String,
+  },
+})
+
+export const SpecialistPrepared = Event.define({
+  type: "orchestrator.specialist-prepared",
+  schema: {
+    sessionID: Schema.String,
+    specialistID: Schema.String,
+    status: Schema.String,
+  },
+})
+
+export const SpecialistReviewed = Event.define({
+  type: "orchestrator.specialist-reviewed",
+  schema: {
+    sessionID: Schema.String,
+    specialistID: Schema.String,
+    reviewStatus: Schema.String,
+    findings: Schema.Finite,
+  },
+})
+
+export const SpecialistApproved = Event.define({
+  type: "orchestrator.specialist-approved",
+  schema: {
+    sessionID: Schema.String,
+    specialistID: Schema.String,
+    approvalType: Schema.String,
+  },
+})
+
+export const SpecialistEscalated = Event.define({
+  type: "orchestrator.specialist-escalated",
+  schema: {
+    sessionID: Schema.String,
+    specialistID: Schema.String,
+    reason: Schema.String,
+  },
+})
+
+export const KnowledgeReviewed = Event.define({
+  type: "orchestrator.knowledge-reviewed",
+  schema: {
+    sessionID: Schema.String,
+    knowledgeType: Schema.String,
+    reviewerID: Schema.String,
+    status: Schema.String,
+  },
+})
+
+export const KnowledgeApproved = Event.define({
+  type: "orchestrator.knowledge-approved",
+  schema: {
+    sessionID: Schema.String,
+    knowledgeType: Schema.String,
+    approverID: Schema.String,
+  },
+})
+
+export const ConsensusReached = Event.define({
+  type: "orchestrator.consensus-reached",
+  schema: {
+    sessionID: Schema.String,
+    consensusLevel: Schema.String,
+    agreementCount: Schema.Finite,
+    disagreementCount: Schema.Finite,
+  },
+})
+
+export const ModelCatalogUpdated = Event.define({
+  type: "orchestrator.model-catalog-updated",
+  schema: {
+    sessionID: Schema.String,
+    modelCount: Schema.Finite,
+    providerCount: Schema.Finite,
+    refreshDurationMs: Schema.Finite,
+  },
+})
+
+export const ProviderCatalogUpdated = Event.define({
+  type: "orchestrator.provider-catalog-updated",
+  schema: {
+    sessionID: Schema.String,
+    providerCount: Schema.Finite,
+    availableCount: Schema.Finite,
+    refreshDurationMs: Schema.Finite,
+  },
+})
+
+export const CapabilitiesDiscovered = Event.define({
+  type: "orchestrator.capabilities-discovered",
+  schema: {
+    sessionID: Schema.String,
+    totalCapabilities: Schema.Finite,
+    coveredCapabilities: Schema.Finite,
+    coverageRatio: Schema.Finite,
+  },
+})
+
+export const ModelRanked = Event.define({
+  type: "orchestrator.model-ranked",
+  schema: {
+    sessionID: Schema.String,
+    strategy: Schema.String,
+    topModelID: Schema.String,
+    topProviderID: Schema.String,
+    topScore: Schema.Finite,
+    candidateCount: Schema.Finite,
+  },
+})
+
+export const ProviderRanked = Event.define({
+  type: "orchestrator.provider-ranked",
+  schema: {
+    sessionID: Schema.String,
+    strategy: Schema.String,
+    topProviderID: Schema.String,
+    topScore: Schema.Finite,
+    candidateCount: Schema.Finite,
+  },
+})
+
+export const FallbackPrepared = Event.define({
+  type: "orchestrator.fallback-prepared",
+  schema: {
+    sessionID: Schema.String,
+    primaryModelID: Schema.String,
+    primaryProviderID: Schema.String,
+    fallbackModelID: Schema.String.pipe(Schema.optional),
+    fallbackProviderID: Schema.String.pipe(Schema.optional),
+    emergencyModelID: Schema.String.pipe(Schema.optional),
+    reason: Schema.String,
+  },
+})
+
+export const SelectionPolicyApplied = Event.define({
+  type: "orchestrator.selection-policy-applied",
+  schema: {
+    sessionID: Schema.String,
+    policyName: Schema.String,
+    strategy: Schema.String,
+    capabilityCount: Schema.Finite,
+    taskComplexity: Schema.Finite,
+  },
+})
+
+export const CatalogRefreshed = Event.define({
+  type: "orchestrator.catalog-refreshed",
+  schema: {
+    sessionID: Schema.String,
+    modelCount: Schema.Finite,
+    providerCount: Schema.Finite,
+    newModelCount: Schema.Finite,
+    deprecatedModelCount: Schema.Finite,
+    refreshDurationMs: Schema.Finite,
+  },
+})
+
 import {
   RuntimeStarted,
   RuntimeCompleted,
@@ -173,7 +619,7 @@ import {
   KnowledgeRanked,
   KnowledgeRejected,
   KnowledgeCached,
-  KnowledgeReused,
+  KnowledgeReused as RuntimeKnowledgeReused,
   RepositoryAnalysed,
   ArchitectureAnalysed,
   DependencyAnalysed,
@@ -184,6 +630,48 @@ import {
   AgentAdviceGenerated,
   PromptAugmented,
   ExecutionPackageReused,
+  SpecialistSessionCreated,
+  SpecialistSessionCompleted,
+  KnowledgeShared,
+  KnowledgeTransferred,
+  ConsensusStarted,
+  ConsensusCompleted,
+  ExecutionRetried,
+  ExecutionRecovered,
+  ExecutionCancelled,
+  CloudExecutionPrepared,
+  CloudExecutionCompleted,
+  BudgetExceeded,
+  ExecutionAdapted,
+  ExecutionSummaryPrepared,
+  ExecutionPackageProjected,
+  ConnectorPlanReused,
+  PromptMetadataPrepared,
+  ExecutionPackageDelivered,
+  ContextPrioritized,
+  WorkflowContextPrepared,
+  ConnectorRegistered as RuntimeConnectorRegistered,
+  ConnectorRequested as RuntimeConnectorRequested,
+  ConnectorPrepared as RuntimeConnectorPrepared,
+  ConnectorCompleted as RuntimeConnectorCompleted,
+  KnowledgeSourceDiscovered as RuntimeKnowledgeSourceDiscovered,
+  ConnectorCacheHit as RuntimeConnectorCacheHit,
+  ConnectorCacheMiss as RuntimeConnectorCacheMiss,
+  TeamCreated as RuntimeTeamCreated,
+  TasksDecomposed as RuntimeTasksDecomposed,
+  WorkAllocated as RuntimeWorkAllocated,
+  WorkspaceUpdated as RuntimeWorkspaceUpdated,
+  TeamDiscussionBuilt as RuntimeTeamDiscussionBuilt,
+  ReviewCompleted as RuntimeReviewCompleted,
+  CapabilityAdvertised as RuntimeCapabilityAdvertised,
+  CollaborationCompleted as RuntimeCollaborationCompleted,
+  ReasoningBuilt as RuntimeReasoningBuilt,
+  ConsensusGenerated as RuntimeConsensusGenerated,
+  NarrativeGenerated as RuntimeNarrativeGenerated,
+  DecisionGenerated as RuntimeDecisionGenerated,
+  ReasoningReused as RuntimeReasoningReused,
+  ReasoningCompressed as RuntimeReasoningCompressed,
+  NarrativeUpdated as RuntimeNarrativeUpdated,
 } from "../runtime/runtime-events"
 
 export const Definitions = [
@@ -214,7 +702,7 @@ export const Definitions = [
   KnowledgeRanked,
   KnowledgeRejected,
   KnowledgeCached,
-  KnowledgeReused,
+  RuntimeKnowledgeReused,
   RepositoryAnalysed,
   ArchitectureAnalysed,
   DependencyAnalysed,
@@ -225,4 +713,94 @@ export const Definitions = [
   AgentAdviceGenerated,
   PromptAugmented,
   ExecutionPackageReused,
+  ExecutionAdvised,
+  ExecutionOptimized,
+  PromptEnhanced,
+  ToolAdviceGenerated,
+  KnowledgeCompressed,
+  KnowledgeReused,
+  ExecutionPackageEnhanced,
+  WorkflowRecommended,
+  ReasoningBuilt,
+  ConsensusGenerated,
+  NarrativeGenerated,
+  DecisionGenerated,
+  ReasoningReused,
+  ReasoningCompressed,
+  NarrativeUpdated,
+  TeamCreated,
+  TasksDecomposed,
+  WorkAllocated,
+  WorkspaceUpdated,
+  TeamDiscussionBuilt,
+  ReviewCompleted,
+  CapabilityAdvertised,
+  CollaborationCompleted,
+  ConnectorRegistered,
+  ConnectorRequested,
+  ConnectorPrepared,
+  ConnectorReused,
+  ConnectorCompleted,
+  KnowledgeSourceDiscovered,
+  ConnectorCacheHit,
+  ConnectorCacheMiss,
+  SpecialistRegistered,
+  SpecialistActivated,
+  SpecialistPrepared,
+  SpecialistReviewed,
+  SpecialistApproved,
+  SpecialistEscalated,
+  KnowledgeReviewed,
+  KnowledgeApproved,
+  ConsensusReached,
+  ModelCatalogUpdated,
+  ProviderCatalogUpdated,
+  CapabilitiesDiscovered,
+  ModelRanked,
+  ProviderRanked,
+  FallbackPrepared,
+  SelectionPolicyApplied,
+  CatalogRefreshed,
+  SpecialistSessionCreated,
+  SpecialistSessionCompleted,
+  KnowledgeShared,
+  KnowledgeTransferred,
+  ConsensusStarted,
+  ConsensusCompleted,
+  ExecutionRetried,
+  ExecutionRecovered,
+  ExecutionCancelled,
+  CloudExecutionPrepared,
+  CloudExecutionCompleted,
+  BudgetExceeded,
+  ExecutionAdapted,
+  ExecutionSummaryPrepared,
+  ExecutionPackageProjected,
+  ConnectorPlanReused,
+  PromptMetadataPrepared,
+  ExecutionPackageDelivered,
+  ContextPrioritized,
+  WorkflowContextPrepared,
+  RuntimeConnectorRegistered,
+  RuntimeConnectorRequested,
+  RuntimeConnectorPrepared,
+  RuntimeConnectorCompleted,
+  RuntimeKnowledgeSourceDiscovered,
+  RuntimeConnectorCacheHit,
+  RuntimeConnectorCacheMiss,
+  RuntimeTeamCreated,
+  RuntimeTasksDecomposed,
+  RuntimeWorkAllocated,
+  RuntimeWorkspaceUpdated,
+  RuntimeTeamDiscussionBuilt,
+  RuntimeReviewCompleted,
+  RuntimeCapabilityAdvertised,
+  RuntimeCollaborationCompleted,
+  RuntimeReasoningBuilt,
+  RuntimeConsensusGenerated,
+  RuntimeNarrativeGenerated,
+  RuntimeDecisionGenerated,
+  RuntimeReasoningReused,
+  RuntimeReasoningCompressed,
+  RuntimeNarrativeUpdated,
 ] as const

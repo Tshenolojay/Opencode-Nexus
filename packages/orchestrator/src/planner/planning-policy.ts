@@ -24,6 +24,7 @@ export interface PlanningPolicy {
   readonly requiresKnowledgeCollection: boolean
   readonly requiresExternalSearch: boolean
   readonly requiresVerification: boolean
+  readonly maxParallelism?: number
   readonly priority: number
 }
 

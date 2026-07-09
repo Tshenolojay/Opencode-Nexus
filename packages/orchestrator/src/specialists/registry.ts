@@ -2,7 +2,9 @@ export * as SpecialistRegistry from "./registry"
 
 import { Context, Effect, Layer } from "effect"
 import type { SpecialistProfile } from "./profiles"
+export type { SpecialistProfile }
 import { DefaultSpecialists } from "./profiles"
+import type { BaseSpecialistInterface } from "./base-specialist"
 import type { TaskType } from "../types/classification"
 import type { Capability } from "../types/capability"
 import type { ConfidenceLevel } from "../types/confidence"
@@ -22,8 +24,11 @@ export interface FilterOptions {
 
 export interface Interface {
   readonly register: (profile: SpecialistProfile) => Effect.Effect<void>
+  readonly registerSpecialist: (specialist: BaseSpecialistInterface) => Effect.Effect<void>
   readonly getAll: () => Effect.Effect<readonly SpecialistProfile[]>
   readonly getByID: (id: string) => Effect.Effect<SpecialistProfile | undefined>
+  readonly getSpecialist: (id: string) => Effect.Effect<BaseSpecialistInterface | undefined>
+  readonly getAllSpecialists: () => Effect.Effect<readonly BaseSpecialistInterface[]>
   readonly filterByCapabilities: (capabilities: readonly Capability[], options?: FilterOptions) => Effect.Effect<readonly SpecialistMatch[]>
   readonly filterByTaskType: (taskType: TaskType, options?: FilterOptions) => Effect.Effect<readonly SpecialistMatch[]>
 }
@@ -53,6 +58,7 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const registered: SpecialistProfile[] = [...DefaultSpecialists]
+    const specialists = new Map<string, BaseSpecialistInterface>()
 
     const register = Effect.fn("SpecialistRegistry.register")(function* (profile: SpecialistProfile) {
       const existing = registered.findIndex((r) => r.id === profile.id)
@@ -63,11 +69,21 @@ const layer = Layer.effect(
       }
     })
 
-    const getAll = Effect.sync(() => registered as readonly SpecialistProfile[])
+    const registerSpecialist = Effect.fn("SpecialistRegistry.registerSpecialist")(function* (specialist: BaseSpecialistInterface) {
+      specialists.set(specialist.id, specialist)
+    })
+
+    const getAll = () => Effect.sync(() => registered as readonly SpecialistProfile[])
 
     const getByID = Effect.fn("SpecialistRegistry.getByID")(function* (id: string) {
       return registered.find((r) => r.id === id)
     })
+
+    const getSpecialist = Effect.fn("SpecialistRegistry.getSpecialist")(function* (id: string) {
+      return specialists.get(id)
+    })
+
+    const getAllSpecialists = () => Effect.sync(() => [...specialists.values()])
 
     const filterByCapabilities = Effect.fn("SpecialistRegistry.filterByCapabilities")(function* (
       capabilities: readonly Capability[],
@@ -94,24 +110,29 @@ const layer = Layer.effect(
       return yield* filterByCapabilities(mappedCapabilities, options)
     })
 
-    return Service.of({ register, getAll, getByID, filterByCapabilities, filterByTaskType })
+    return Service.of({
+      register, registerSpecialist, getAll, getByID, getSpecialist, getAllSpecialists,
+      filterByCapabilities, filterByTaskType,
+    })
   }),
 )
 
 export { layer }
 
 function taskTypeToCapabilities(taskType: TaskType): Capability[] {
-  const map: Partial<Record<TaskType, Capability[]>> = {
+  const map: Record<TaskType, Capability[]> = {
     "code-generation": ["code-generation", "tool-use", "reasoning"],
-    "code-review": ["analysis", "reasoning"],
-    "code-search": ["search", "repository-understanding"],
-    debug: ["analysis", "reasoning", "tool-use"],
-    test: ["code-generation", "analysis", "tool-use"],
-    refactor: ["code-generation", "reasoning", "repository-understanding"],
-    "dependency-management": ["search", "analysis"],
-    architecture: ["analysis", "reasoning", "planning"],
-    research: ["search", "analysis", "reasoning"],
-    planning: ["planning", "reasoning", "analysis"],
+    "bug-fix": ["analysis", "reasoning"],
+    debugging: ["analysis", "reasoning", "tool-use"],
+    "repository-search": ["search", "repository-understanding"],
+    "dependency-investigation": ["search", "analysis"],
+    "architecture-design": ["analysis", "reasoning", "planning"],
+    documentation: ["documentation-analysis", "analysis"],
+    testing: ["code-generation", "analysis", "tool-use"],
+    refactoring: ["code-generation", "reasoning", "repository-understanding"],
+    "performance-optimisation": ["analysis", "reasoning"],
+    "security-review": ["analysis", "reasoning"],
+    "general-chat": ["reasoning"],
   }
-  return map[taskType] ?? ["reasoning"]
+  return map[taskType]
 }

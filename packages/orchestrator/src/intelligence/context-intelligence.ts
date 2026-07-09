@@ -23,7 +23,7 @@ const prepare: Interface["prepare"] = Effect.fn("ContextIntelligence.prepare")(f
   const totalKnowledgeTypes = fields.length
 
   const meta = bundle.knowledgeMeta ?? {}
-  const confidences = Object.values(meta).map((m) => m.confidence).filter((c) => c > 0)
+  const confidences = Object.values(meta).map((m: unknown) => (m as Record<string, unknown>).confidence as number).filter((c) => c > 0)
   const averageConfidence = confidences.length > 0
     ? confidences.reduce((a, b) => a + b, 0) / confidences.length
     : 0

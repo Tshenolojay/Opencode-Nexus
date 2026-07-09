@@ -1,0 +1,17 @@
+export const Config = {
+  minimumConfidence: 0.65,
+  maxSpecialists: 4,
+  compressionMaxSection: 1000,
+  compressionMaxTotal: 2400,
+  cacheDefaultTTLMs: 300_000,
+  reuseEnabled: true,
+  connectorReuseEnabled: true,
+  reasoningCompressionEnabled: true,
+  teamFrameworkEnabled: true,
+  validationEnabled: true,
+  diagnosticsEnabled: true,
+  pipelineStageTimeoutMs: 30_000,
+  maxKnowledgeEntriesPerType: 100,
+  maxReasoningHistoryEntries: 10,
+  maxExecutionNotes: 5,
+}

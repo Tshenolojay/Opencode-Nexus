@@ -2,7 +2,7 @@ export * as TaskClassifier from "./classifier"
 
 import { Context, Effect, Layer, Schema } from "effect"
 import { TaskType } from "../types/classification"
-import type { TaskClassification } from "./schema"
+import { TaskClassification, type TaskClassification as _TaskClassification } from "./schema"
 import { ClassifierInput, type ClassifierInputRich, type ClassifierSignal, type ClassificationResult } from "./schema"
 
 export interface Interface {

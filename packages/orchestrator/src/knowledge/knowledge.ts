@@ -4,12 +4,21 @@ import type { TaskType } from "../types/classification"
 
 export interface KnowledgeEntryMeta {
   readonly sourceSpecialist: string | undefined
+  readonly reviewerSpecialist: string | undefined
   readonly timestamp: number
   readonly confidence: number
   readonly validation: "valid" | "invalid" | "unvalidated"
   readonly ranking: number
   readonly origin: string | undefined
+  readonly freshness: number | undefined
   readonly reusable: boolean
+  readonly dependencies: readonly string[] | undefined
+  readonly supportingSpecialists: readonly string[] | undefined
+  readonly conflictingSpecialists: readonly string[] | undefined
+  readonly importance: number | undefined
+  readonly reuseEligibility: "eligible" | "ineligible" | "expired" | undefined
+  readonly reviewStatus: "pending" | "approved" | "rejected" | "needs-changes" | undefined
+  readonly verificationStatus: "pending" | "passed" | "failed" | "skipped" | undefined
 }
 
 export interface KnowledgeBundle {

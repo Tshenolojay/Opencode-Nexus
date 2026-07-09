@@ -4,6 +4,10 @@ import { Context, Effect, Layer } from "effect"
 import type { TaskClassification, ClassificationResult } from "../classifier/schema"
 import type { Capability, CapabilityRequirement } from "../types/capability"
 import type { ConfidenceLevel } from "../types/confidence"
+import type { SpecialistProfile } from "../specialists/profiles"
+import { SpecialistRegistry } from "../specialists/registry"
+import type { BaseSpecialistInterface } from "../specialists/base-specialist"
+import type { TaskType } from "../types/classification"
 
 export interface CapabilityPlan {
   readonly requirements: readonly CapabilityRequirement[]
@@ -13,6 +17,19 @@ export interface CapabilityPlan {
   readonly highPriority: readonly Capability[]
   readonly mediumPriority: readonly Capability[]
   readonly lowPriority: readonly Capability[]
+}
+
+export interface SpecialistCapabilityMatch {
+  readonly specialist: SpecialistProfile
+  readonly primaryScore: number
+  readonly secondaryScore: number
+  readonly optionalScore: number
+  readonly fallbackScore: number
+  readonly totalScore: number
+  readonly matchedPrimary: readonly string[]
+  readonly matchedSecondary: readonly string[]
+  readonly matchedOptional: readonly string[]
+  readonly modelFitScore: number
 }
 
 export interface PlannerInput {
@@ -27,6 +44,8 @@ export interface PlannerInput {
 
 export interface Interface {
   readonly plan: (input: PlannerInput) => Effect.Effect<CapabilityPlan>
+  readonly matchSpecialists: (specialists: readonly SpecialistProfile[], required: readonly Capability[]) => Effect.Effect<readonly SpecialistCapabilityMatch[]>
+  readonly selectSpecialists: (taskType: TaskType) => Effect.Effect<readonly BaseSpecialistInterface[]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/orchestrator/CapabilityPlanner") {}
@@ -36,10 +55,14 @@ const plan: Interface["plan"] = Effect.fn("CapabilityPlanner.plan")(function* (i
   const requirements: CapabilityRequirement[] = []
 
   const add = (capability: Capability, weight: number, optional: boolean) => {
-    const existing = requirements.find((r) => r.capability === capability)
-    if (existing) {
-      existing.weight = Math.max(existing.weight, weight)
-      if (!optional) existing.optional = false
+    const idx = requirements.findIndex((r) => r.capability === capability)
+    if (idx >= 0) {
+      const ex = requirements[idx]
+      requirements[idx] = {
+        ...ex,
+        weight: Math.max(ex.weight, weight),
+        optional: optional ? ex.optional : false,
+      }
     } else {
       requirements.push({ capability, weight, optional })
     }
@@ -175,10 +198,72 @@ const plan: Interface["plan"] = Effect.fn("CapabilityPlanner.plan")(function* (i
   }
 })
 
+function scoreModelFit(specialist: SpecialistProfile, _required: readonly string[]): number {
+  const req = specialist.modelRequirements
+  if (!req) return 0.5
+
+  let score = 0.5
+  if (req.preferredReasoningModel) score += 0.1
+  if (req.preferredSearchModel) score += 0.1
+  if (req.preferredLongContextModel) score += 0.1
+  if (req.preferredFastModel) score += 0.08
+  if (req.preferredCheapModel) score += 0.06
+  if (req.preferredMultimodalModel) score += 0.06
+  return Math.min(1, score)
+}
+
+const matchSpecialists: Interface["matchSpecialists"] = Effect.fn("CapabilityPlanner.matchSpecialists")(function* (
+  specialists: readonly SpecialistProfile[],
+  required: readonly Capability[],
+) {
+  const requiredSet = new Set(required)
+
+  const results: SpecialistCapabilityMatch[] = specialists.map((s) => {
+    const primary = s.preferredCapabilities ?? s.requiredCapabilities
+    const secondary = s.secondaryCapabilities ?? []
+    const optional = s.optionalCapabilities ?? []
+    const fallback = s.fallbackCapabilities ?? []
+
+    const matchedPrimary = primary.filter((c) => requiredSet.has(c as Capability))
+    const matchedSecondary = secondary.filter((c) => requiredSet.has(c as Capability))
+    const matchedOptional = optional.filter((c) => requiredSet.has(c as Capability))
+
+    const primaryScore = primary.length > 0 ? matchedPrimary.length / primary.length : 0
+    const secondaryScore = secondary.length > 0 ? matchedSecondary.length / secondary.length : 0
+    const optionalScore = optional.length > 0 ? matchedOptional.length / optional.length : 0
+
+    const fallbackScore = fallback.filter((c) => requiredSet.has(c as Capability)).length > 0 ? 0.3 : 0
+
+    const totalScore = primaryScore * 0.6 + secondaryScore * 0.2 + optionalScore * 0.1 + fallbackScore * 0.1
+    const modelFitScore = scoreModelFit(s, required)
+
+    return {
+      specialist: s,
+      primaryScore,
+      secondaryScore,
+      optionalScore,
+      fallbackScore,
+      totalScore,
+      matchedPrimary: matchedPrimary as readonly string[],
+      matchedSecondary: matchedSecondary as readonly string[],
+      matchedOptional: matchedOptional as readonly string[],
+      modelFitScore,
+    }
+  })
+
+  return results.sort((a, b) => b.totalScore - a.totalScore)
+})
+
+const selectSpecialists: Interface["selectSpecialists"] = Effect.fn("CapabilityPlanner.selectSpecialists")(function* (taskType: TaskType) {
+  const registry = yield* SpecialistRegistry.Service
+  const all = yield* registry.getAllSpecialists()
+  return all.filter((s) => s.canHandle(taskType))
+})
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    return Service.of({ plan })
+    return Service.of({ plan, matchSpecialists, selectSpecialists })
   }),
 )
 

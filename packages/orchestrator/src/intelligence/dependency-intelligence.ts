@@ -21,6 +21,7 @@ export interface DependencyAnalysis {
   readonly chains: readonly DependencyChain[]
   readonly blastRadius: number
   readonly summary: string
+  readonly risks: readonly string[]
 }
 
 export interface Interface {
@@ -62,7 +63,8 @@ const analyze: Interface["analyze"] = Effect.fn("DependencyIntelligence.analyze"
     ? "No dependencies detected."
     : `${blastRadius} unique dependencies (${affectedPackages.filter((a) => a.impactLevel === "direct").length} direct, ${affectedPackages.filter((a) => a.impactLevel === "transitive").length} transitive). ${chains.length} dependency chains identified.`
 
-  return { affectedPackages, chains, blastRadius, summary }
+  const risks: string[] = blastRadius > 5 ? [`${blastRadius} unique dependencies — review for unnecessary coupling`] : []
+  return { affectedPackages, chains, blastRadius, summary, risks }
 })
 
 function buildChain(dep: DependencyInfo, all: readonly DependencyInfo[], visited: Set<string>, depth: number): readonly string[] {

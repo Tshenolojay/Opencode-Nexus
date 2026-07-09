@@ -3,6 +3,11 @@ export * as ModelSelector from "./selector"
 import { Context, Effect, Layer } from "effect"
 import type { Capability, CapabilityProfile, CapabilityRequirement } from "../types/capability"
 import type { TaskType } from "../types/classification"
+import { ModelRanking } from "../model/model-ranking"
+import { SelectionPolicies } from "../model/selection-policies"
+import { CapabilityRegistry } from "../model/capability-registry"
+import type { RankedModel } from "../model/model-ranking"
+import type { SelectionPolicy } from "../model/selection-policies"
 
 export interface ModelSelection {
   readonly providerID: string
@@ -38,6 +43,16 @@ export interface AvailableModel {
   readonly priority: number
 }
 
+export interface RichSelection {
+  readonly primary: ModelSelection | undefined
+  readonly secondary: readonly ModelSelection[]
+  readonly fallback: ModelSelection | undefined
+  readonly emergencyFallback: ModelSelection | undefined
+  readonly equivalents: readonly ModelSelection[]
+  readonly policy: string
+  readonly strategy: string
+}
+
 export interface Interface {
   readonly select: (input: Input) => Effect.Effect<ModelSelection | undefined>
   readonly evaluate: (input: Input) => Effect.Effect<ModelEvaluation>
@@ -49,6 +64,7 @@ export interface Interface {
     readonly requiresDependencyGraph: boolean
     readonly requiresVerification: boolean
   }) => Effect.Effect<CapabilityProfile>
+  readonly selectWithFallback: (input: Input, policyName?: string) => Effect.Effect<RichSelection>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/orchestrator/ModelSelector") {}
@@ -139,6 +155,7 @@ function scoreModel(
 }
 
 const estimateCapabilities: Interface["estimateCapabilities"] = Effect.fn("ModelSelector.estimateCapabilities")(function* (input) {
+  const capRegistry = yield* CapabilityRegistry.Service
   const requirements = taskTypeToCapabilities(input.taskType, input.complexity)
 
   let reason: string
@@ -230,10 +247,44 @@ const evaluate: Interface["evaluate"] = Effect.fn("ModelSelector.evaluate")(func
   return { selection, candidates: scoredCandidates }
 })
 
+const selectWithFallback: Interface["selectWithFallback"] = Effect.fn("ModelSelector.selectWithFallback")(function* (input, policyName) {
+  const modelRanking = yield* ModelRanking.Service
+  const policies = yield* SelectionPolicies.Service
+
+  const policy = policyName ? policies.getPolicy(policyName) ?? SelectionPolicies.DEFAULT_POLICY : SelectionPolicies.DEFAULT_POLICY
+  const requirements: CapabilityRequirement[] = input.requiredCapabilities.map((c) => ({
+    capability: c, weight: 1, optional: false,
+  }))
+
+  const { adjustedRequirements } = policies.applyPolicy(requirements, policy)
+  const result = yield* modelRanking.rank(adjustedRequirements, policy.modelStrategy)
+
+  const toSelection = (r: RankedModel | undefined): ModelSelection | undefined => {
+    if (!r) return undefined
+    return {
+      providerID: r.model.providerID,
+      modelID: r.model.modelID,
+      capabilities: r.model.capabilities,
+      reason: r.reasoning.join("; "),
+      matchScore: r.rankScore,
+    }
+  }
+
+  return {
+    primary: toSelection(result.primary),
+    secondary: result.secondary.map(toSelection).filter((s): s is ModelSelection => s !== undefined),
+    fallback: toSelection(result.fallback),
+    emergencyFallback: toSelection(result.emergencyFallback),
+    equivalents: result.equivalents.map(toSelection).filter((s): s is ModelSelection => s !== undefined),
+    policy: policy.name,
+    strategy: policy.modelStrategy,
+  }
+})
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    return Service.of({ select, evaluate, estimateCapabilities })
+    return Service.of({ select, evaluate, estimateCapabilities, selectWithFallback })
   }),
 )
 

@@ -1,11 +1,12 @@
 export * as ExecutionScheduler from "./execution-scheduler"
 
-import { Context, Effect, Layer } from "effect"
+import { Array, Context, Effect, Layer, Order } from "effect"
 import type { Graph, GraphNode } from "../planner/execution-graph"
 import type { PlanningPolicy } from "../planner/planning-policy"
 import type { KnowledgePlan } from "../planner/knowledge-planner"
 import type { CapabilityPlan } from "../planner/capability-planner"
 import { SpecialistRegistry } from "../specialists/registry"
+import { ExecutionBudget } from "./execution-budget"
 
 export interface ScheduleBatch {
   readonly index: number
@@ -17,6 +18,9 @@ export interface Schedule {
   readonly batches: readonly ScheduleBatch[]
   readonly totalBatches: number
   readonly estimatedDurationMs: number
+  readonly budgetAware: boolean
+  readonly capabilityAware: boolean
+  readonly confidenceAware: boolean
 }
 
 export interface ScheduleInput {
@@ -25,6 +29,9 @@ export interface ScheduleInput {
   readonly capabilityPlan: CapabilityPlan
   readonly knowledgePlan: KnowledgePlan | undefined
   readonly repositorySize: number
+  readonly budgetAware?: boolean
+  readonly capabilityAware?: boolean
+  readonly confidenceAware?: boolean
 }
 
 export interface Interface {
@@ -38,13 +45,14 @@ function dependsOn(graph: Graph, node: GraphNode, other: GraphNode): boolean {
 }
 
 const schedule: Interface["schedule"] = Effect.fn("ExecutionScheduler.schedule")(function* (input) {
-  const { graph, policy, repositorySize } = input
+  const { graph, policy, repositorySize, budgetAware, capabilityAware, confidenceAware } = input
   const registry = yield* SpecialistRegistry.Service
+  const budget = yield* ExecutionBudget.Service
   const allProfiles = yield* registry.getAll()
   const specialistNodes = graph.nodes.filter((n) => n.type === "specialist")
 
   if (specialistNodes.length === 0) {
-    return { batches: [], totalBatches: 0, estimatedDurationMs: 0 }
+    return { batches: [], totalBatches: 0, estimatedDurationMs: 0, budgetAware: false, capabilityAware: false, confidenceAware: false }
   }
 
   const contractMap = new Map<string, { requires: readonly string[]; produces: readonly string[] }>()
@@ -63,13 +71,32 @@ const schedule: Interface["schedule"] = Effect.fn("ExecutionScheduler.schedule")
   }
 
   const maxParallel = policy.maxSpecialists > 0 ? Math.min(policy.maxSpecialists, 4) : 1
+
+  let orderedNodes = [...specialistNodes]
+
+  if (confidenceAware && input.capabilityPlan) {
+    const highPriority = new Set(input.capabilityPlan.highPriority)
+    orderedNodes = Array.sort(orderedNodes, Order.flip(Order.mapInput(Order.Number, (n) => highPriority.has(n.id) ? 2 : 1)))
+  }
+
+  if (capabilityAware && input.capabilityPlan) {
+    const required = new Set(input.capabilityPlan.required)
+    orderedNodes = Array.sort(orderedNodes, Order.flip(Order.mapInput(Order.Number, (n) => required.has(n.id) ? 2 : 1)))
+  }
+
   const batches: ScheduleBatch[] = []
   const scheduled = new Set<string>()
   let index = 0
 
-  while (scheduled.size < specialistNodes.length) {
-    const ready = specialistNodes.filter((n) => {
+  while (scheduled.size < orderedNodes.length) {
+    const ready = orderedNodes.filter((n) => {
       if (scheduled.has(n.id)) return false
+
+      if (budgetAware) {
+        const hasTime = budget.hasBudget("timeMs")
+        const hasSpecialists = budget.hasBudget("specialistsUsed")
+        if (!hasTime || !hasSpecialists) return false
+      }
 
       const contract = contractMap.get(n.id)
       if (!contract || contract.requires.length === 0) return true
@@ -117,11 +144,16 @@ const schedule: Interface["schedule"] = Effect.fn("ExecutionScheduler.schedule")
     return acc + maxInBatch
   }, 0)
 
-  if (repositorySize > 5000) {
-    return { batches, totalBatches: batches.length, estimatedDurationMs: estimatedDurationMs * 1.2 }
-  }
+  const multiplier = repositorySize > 5000 ? 1.2 : 1
 
-  return { batches, totalBatches: batches.length, estimatedDurationMs }
+  return {
+    batches,
+    totalBatches: batches.length,
+    estimatedDurationMs: estimatedDurationMs * multiplier,
+    budgetAware: budgetAware ?? false,
+    capabilityAware: capabilityAware ?? false,
+    confidenceAware: confidenceAware ?? false,
+  }
 })
 
 const layer = Layer.effect(

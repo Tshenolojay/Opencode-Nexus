@@ -79,7 +79,60 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()("@opencode/orchestrator/AgentDispatcher") {}
 
 function buildPlan(agents: AgentRole[], knowledgeTargets: string[], input: InputRich | undefined): DispatchPlan {
-  const plan: DispatchPlan = {
+  if (!input) {
+    return {
+      requiredAgents: agents,
+      executionOrder: agents.includes("search") || agents.includes("dependency")
+        ? [
+            agents.filter((a) => a === "search" || a === "dependency"),
+            agents.filter((a) => a === "context"),
+            agents.filter((a) => a === "verification"),
+          ]
+        : [agents],
+      parallelGroups: [agents.filter((a) => a === "search" || a === "dependency")].filter((g) => g.length > 0),
+      knowledgeTargets,
+      agentSpecs: undefined,
+      dependencies: undefined,
+      parallelGroupInfo: undefined,
+      priority: undefined,
+      estimatedCost: undefined,
+      estimatedDurationMs: undefined,
+    }
+  }
+
+  const agentSpecs = agents.map((role, i) => ({
+    role,
+    priority: agents.length - i,
+    dependsOn: role === "context" && agents.includes("search")
+      ? (["search"] as readonly AgentRole[])
+      : role === "verification" && (agents.includes("search") || agents.includes("dependency"))
+        ? ([agents.find((a) => a === "search" || a === "dependency")!] as readonly AgentRole[])
+        : ([] as readonly AgentRole[]),
+    estimatedCost: role === "search" ? 0.03 : role === "dependency" ? 0.04 : role === "verification" ? 0.02 : 0,
+    estimatedDurationMs: role === "search" ? 3000 : role === "context" ? 1000 : role === "dependency" ? 2000 : 1000,
+    requiredCapabilities: role === "search"
+      ? (["search"] as readonly string[])
+      : role === "context" ? (["long-context"] as readonly string[]) : role === "dependency" ? (["search"] as readonly string[]) : ([] as readonly string[]),
+  }))
+
+  const dependencies: AgentDependency[] = []
+  for (const spec of agentSpecs) {
+    for (const dep of spec.dependsOn) {
+      dependencies.push({ from: spec.role, to: dep, kind: "feeds" })
+    }
+  }
+
+  const parallelGroups = [agents.filter((a) => a === "search" || a === "dependency")].filter((g) => g.length > 0)
+
+  const parallelGroupInfo = parallelGroups.map((group, i) => ({
+    agents: group,
+    description: i === 0 ? "Discovery phase" : `Phase ${i + 1}`,
+  }))
+
+  const cost = agentSpecs.reduce((acc, s) => acc + s.estimatedCost, 0)
+  const duration = agentSpecs.reduce((acc, s) => acc + s.estimatedDurationMs, 0)
+
+  return {
     requiredAgents: agents,
     executionOrder: agents.includes("search") || agents.includes("dependency")
       ? [
@@ -88,50 +141,15 @@ function buildPlan(agents: AgentRole[], knowledgeTargets: string[], input: Input
           agents.filter((a) => a === "verification"),
         ]
       : [agents],
-    parallelGroups: [agents.filter((a) => a === "search" || a === "dependency")].filter((g) => g.length > 0),
+    parallelGroups,
     knowledgeTargets,
-    agentSpecs: undefined,
-    dependencies: undefined,
-    parallelGroupInfo: undefined,
-    priority: undefined,
-    estimatedCost: undefined,
-    estimatedDurationMs: undefined,
+    agentSpecs,
+    dependencies,
+    parallelGroupInfo,
+    priority: input.complexity,
+    estimatedCost: cost,
+    estimatedDurationMs: duration,
   }
-
-  if (input) {
-    plan.priority = input.complexity
-    plan.agentSpecs = agents.map((role, i) => ({
-      role,
-      priority: agents.length - i,
-      dependsOn: role === "context" && agents.includes("search")
-        ? ["search"]
-        : role === "verification" && (agents.includes("search") || agents.includes("dependency"))
-          ? [agents.find((a) => a === "search" || a === "dependency")!]
-          : [],
-      estimatedCost: role === "search" ? 0.03 : role === "dependency" ? 0.04 : role === "verification" ? 0.02 : 0,
-      estimatedDurationMs: role === "search" ? 3000 : role === "context" ? 1000 : role === "dependency" ? 2000 : 1000,
-      requiredCapabilities: role === "search"
-        ? ["search"]
-        : role === "context" ? ["long-context"] : role === "dependency" ? ["search"] : [],
-    }))
-
-    plan.dependencies = []
-    for (const spec of plan.agentSpecs) {
-      for (const dep of spec.dependsOn) {
-        plan.dependencies.push({ from: spec.role, to: dep, kind: "feeds" })
-      }
-    }
-
-    plan.parallelGroupInfo = plan.parallelGroups.map((group, i) => ({
-      agents: group,
-      description: i === 0 ? "Discovery phase" : `Phase ${i + 1}`,
-    }))
-
-    plan.estimatedCost = plan.agentSpecs.reduce((acc, s) => acc + s.estimatedCost, 0)
-    plan.estimatedDurationMs = plan.agentSpecs.reduce((acc, s) => acc + s.estimatedDurationMs, 0)
-  }
-
-  return plan
 }
 
 const plan: Interface["plan"] = Effect.fn("AgentDispatcher.plan")(function* (input) {

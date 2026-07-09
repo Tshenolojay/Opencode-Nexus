@@ -1,7 +1,7 @@
 export * as SessionV2 from "./session"
 export * from "./session/schema"
 
-import { DateTime, Effect, Layer, Schema, Context, Stream, Option, pipe } from "effect"
+import { DateTime, Effect, Layer, Schema, Context, Stream, Option, pipe, Duration } from "effect"
 import { ListAnchor } from "@opencode-ai/schema/session"
 import { and, asc, desc, eq, gt, like, lt, or, type SQL } from "drizzle-orm"
 import { ProjectV2 } from "./project"
@@ -403,6 +403,7 @@ const layer = Layer.effect(
                           toolResults: undefined,
                           projectInfo: undefined,
                         }),
+                        Effect.timeout(Duration.seconds(5)),
                         Effect.option,
                         Effect.asVoid,
                       ),

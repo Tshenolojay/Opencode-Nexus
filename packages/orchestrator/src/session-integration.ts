@@ -1,6 +1,6 @@
 export * as SessionIntegration from "./session-integration"
 
-import { Effect } from "effect"
+import { Context, Effect, Layer } from "effect"
 import type { ExecutionDecision } from "./contracts/execution-decision"
 import type { ExecutionPackage } from "./integration/execution-package"
 import { OrchestratorService } from "./orchestrator"
@@ -52,113 +52,114 @@ function buildSummary(diagnostics: readonly PhaseEntry[]): {
   }
 }
 
-export class Service extends Effect.Service<Service>()("@opencode/orchestrator/SessionIntegration", {
-  effect: Effect.gen(function* () {
-    const orchestrator = yield* OrchestratorService.Service
+export class Service extends Context.Service<Service, Interface>()("@opencode/orchestrator/SessionIntegration") {}
 
-    const decide = Effect.fn("SessionIntegration.decide")(function* (input: IntegrationInput): Effect.Effect<IntegrationResult> {
-      const { decision, timing, diagnostics: entries } = yield* orchestrator.orchestrateWithContext({
-        promptText: input.promptText,
-        sessionID: input.sessionID,
-        filesAttached: input.filesAttached,
-        conversationLength: input.conversationLength,
-        repositorySize: input.repositorySize,
-        contextAvailable: input.contextAvailable,
-        previousToolResults: input.previousToolResults,
-        sessionMetadata: input.sessionMetadata,
-        assistantResponses: input.assistantResponses,
-        toolResults: input.toolResults,
-        projectInfo: input.projectInfo,
-      })
+const make = Effect.gen(function* () {
+  const orchestrator = yield* OrchestratorService.Service
 
-      const summary = buildSummary(entries)
-
-      const executionDecision: ExecutionDecision = {
-        needsOrchestration: decision.needsOrchestration,
-        continueNormally: decision.confidence === "high",
-        decision,
-        confidenceScore: decision.confidenceScore,
-        selectedCapabilities: decision.selectedCapabilities,
-        dispatchPlan: decision.dispatchPlan,
-        knowledgeRequirements: decision.knowledgeRequirements,
-        executionNotes: decision.executionNotes,
-        diagnostics: {
-          taskType: decision.taskClassification?.type,
-          confidence: decision.confidence,
-          confidenceScore: decision.confidenceScore?.score,
-          capabilities: decision.selectedCapabilities ?? [],
-          requiredAgents: decision.dispatchPlan.requiredAgents,
-          estimatedSpecialists: decision.dispatchPlan.requiredAgents.length,
-          requiresFurtherPlanning: decision.dispatchPlan.requiredAgents.length > 0,
-          totalPlanningTimeMs: summary.totalPlanningTimeMs,
-          phasesCompleted: summary.phasesCompleted,
-        },
-        timing,
-      }
-
-      return { decision: executionDecision, shouldBypass: executionDecision.continueNormally }
+  const decide = Effect.fn("SessionIntegration.decide")(function* (input: IntegrationInput) {
+    const { decision, timing, diagnostics: entries } = yield* orchestrator.orchestrateWithContext({
+      promptText: input.promptText,
+      sessionID: input.sessionID,
+      filesAttached: input.filesAttached,
+      conversationLength: input.conversationLength,
+      repositorySize: input.repositorySize,
+      contextAvailable: input.contextAvailable,
+      previousToolResults: input.previousToolResults,
+      sessionMetadata: input.sessionMetadata,
+      assistantResponses: input.assistantResponses,
+      toolResults: input.toolResults,
+      projectInfo: input.projectInfo,
     })
 
-    const integrate = Effect.fn("SessionIntegration.integrate")(function* (input: IntegrationInput): Effect.Effect<ExecutionPackage> {
-      const { executionPackage } = yield* orchestrator.orchestrateWithContext({
-        promptText: input.promptText,
-        sessionID: input.sessionID,
-        filesAttached: input.filesAttached,
-        conversationLength: input.conversationLength,
-        repositorySize: input.repositorySize,
-        contextAvailable: input.contextAvailable,
-        previousToolResults: input.previousToolResults,
-        sessionMetadata: input.sessionMetadata,
-        assistantResponses: input.assistantResponses,
-        toolResults: input.toolResults,
-        projectInfo: input.projectInfo,
-      })
-      return executionPackage
+    const summary = buildSummary(entries)
+
+    const executionDecision: ExecutionDecision = {
+      needsOrchestration: decision.needsOrchestration,
+      continueNormally: decision.confidence === "high",
+      decision,
+      confidenceScore: decision.confidenceScore,
+      selectedCapabilities: decision.selectedCapabilities,
+      dispatchPlan: decision.dispatchPlan,
+      knowledgeRequirements: decision.knowledgeRequirements,
+      executionNotes: decision.executionNotes,
+      diagnostics: {
+        taskType: decision.taskClassification?.type,
+        confidence: decision.confidence,
+        confidenceScore: decision.confidenceScore?.score,
+        capabilities: decision.selectedCapabilities ?? [],
+        requiredAgents: decision.dispatchPlan.requiredAgents,
+        estimatedSpecialists: decision.dispatchPlan.requiredAgents.length,
+        requiresFurtherPlanning: decision.dispatchPlan.requiredAgents.length > 0,
+        totalPlanningTimeMs: summary.totalPlanningTimeMs,
+        phasesCompleted: summary.phasesCompleted,
+      },
+      timing,
+    }
+
+    return { decision: executionDecision, shouldBypass: executionDecision.continueNormally }
+  })
+
+  const integrate = Effect.fn("SessionIntegration.integrate")(function* (input: IntegrationInput) {
+    const { executionPackage } = yield* orchestrator.orchestrateWithContext({
+      promptText: input.promptText,
+      sessionID: input.sessionID,
+      filesAttached: input.filesAttached,
+      conversationLength: input.conversationLength,
+      repositorySize: input.repositorySize,
+      contextAvailable: input.contextAvailable,
+      previousToolResults: input.previousToolResults,
+      sessionMetadata: input.sessionMetadata,
+      assistantResponses: input.assistantResponses,
+      toolResults: input.toolResults,
+      projectInfo: input.projectInfo,
+    })
+    return executionPackage
+  })
+
+  const bypass = Effect.fn("SessionIntegration.bypass")(function* (input: IntegrationInput) {
+    const decision = yield* orchestrator.skip({
+      promptText: input.promptText,
+      sessionID: input.sessionID,
+      filesAttached: input.filesAttached,
+      conversationLength: input.conversationLength,
+      repositorySize: input.repositorySize,
+      contextAvailable: input.contextAvailable,
+      previousToolResults: input.previousToolResults,
+      sessionMetadata: undefined,
+      assistantResponses: undefined,
+      toolResults: undefined,
+      projectInfo: undefined,
     })
 
-    const bypass = Effect.fn("SessionIntegration.bypass")(function* (input: IntegrationInput): Effect.Effect<IntegrationResult> {
-      const decision = yield* orchestrator.skip({
-        promptText: input.promptText,
-        sessionID: input.sessionID,
-        filesAttached: input.filesAttached,
-        conversationLength: input.conversationLength,
-        repositorySize: input.repositorySize,
-        contextAvailable: input.contextAvailable,
-        previousToolResults: input.previousToolResults,
-        sessionMetadata: undefined,
-        assistantResponses: undefined,
-        toolResults: undefined,
-        projectInfo: undefined,
-      })
-
-      const executionDecision: ExecutionDecision = {
-        needsOrchestration: false,
-        continueNormally: true,
-        decision,
+    const executionDecision: ExecutionDecision = {
+      needsOrchestration: false,
+      continueNormally: true,
+      decision,
+      confidenceScore: undefined,
+      selectedCapabilities: undefined,
+      dispatchPlan: decision.dispatchPlan,
+      knowledgeRequirements: undefined,
+      executionNotes: undefined,
+      diagnostics: {
+        taskType: undefined,
+        confidence: "high",
         confidenceScore: undefined,
-        selectedCapabilities: undefined,
-        dispatchPlan: decision.dispatchPlan,
-        knowledgeRequirements: undefined,
-        executionNotes: undefined,
-        diagnostics: {
-          taskType: undefined,
-          confidence: "high",
-          confidenceScore: undefined,
-          capabilities: [],
-          requiredAgents: [],
-          estimatedSpecialists: 0,
-          requiresFurtherPlanning: false,
-          totalPlanningTimeMs: 0,
-          phasesCompleted: ["bypass"],
-        },
-        timing: undefined,
-      }
+        capabilities: [],
+        requiredAgents: [],
+        estimatedSpecialists: 0,
+        requiresFurtherPlanning: false,
+        totalPlanningTimeMs: 0,
+        phasesCompleted: ["bypass"],
+      },
+      timing: undefined,
+    }
 
-      return { decision: executionDecision, shouldBypass: true }
-    })
+    return { decision: executionDecision, shouldBypass: true }
+  })
 
-    return Service.of({ decide, bypass, integrate })
-  }),
-}) {}
+  return Service.of({ decide, bypass, integrate })
+})
 
-export const layer = Service.Default
+const layer = Layer.effect(Service, make)
+export { layer }

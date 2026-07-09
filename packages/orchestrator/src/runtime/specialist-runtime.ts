@@ -9,7 +9,11 @@ import { RuntimeFallback } from "./runtime-fallback"
 import { RuntimeResult, fromSpecialistResult } from "./runtime-result"
 import type { RuntimeContextData } from "./runtime-context"
 import { SpecialistExecutor } from "../execution/specialist-executor"
-import type { SpecialistResult } from "../execution/specialist-result"
+import { CloudExecutionAdapter } from "../execution/cloud-execution-adapter"
+import { ExecutionBudget } from "../execution/execution-budget"
+import { SpecialistSession } from "../session/specialist-session"
+import { SpecialistConversation } from "../session/specialist-conversation"
+import type { SpecialistResult, ModelCandidate } from "../execution/specialist-result"
 import type { KnowledgeBundle } from "../knowledge/knowledge"
 import type { KnowledgePlan } from "../planner/knowledge-planner"
 import type { CapabilityPlan } from "../planner/capability-planner"
@@ -24,6 +28,10 @@ export interface RuntimeInput {
   readonly capabilityPlan: CapabilityPlan | undefined
   readonly runtimeContext: RuntimeContextData
   readonly sessionID: string
+  readonly modelAssignment?: {
+    readonly primary: ModelCandidate | undefined
+    readonly fallback: ModelCandidate | undefined
+  }
 }
 
 export interface RuntimeOutput {
@@ -31,6 +39,9 @@ export interface RuntimeOutput {
   readonly specialistResult: SpecialistResult
   readonly cached: boolean
   readonly attempts: number
+  readonly sessionID: string | undefined
+  readonly cloudExecuted: boolean
+  readonly budgetRemaining: boolean
 }
 
 export interface Interface {
@@ -45,6 +56,18 @@ const execute: Interface["execute"] = Effect.fn("SpecialistRuntime.execute")(fun
   const fallback = yield* RuntimeFallback.Service
   const promptBuilder = yield* PromptBuilder.Service
   const executor = yield* SpecialistExecutor.Service
+  const cloudAdapter = yield* CloudExecutionAdapter.Service
+  const budget = yield* ExecutionBudget.Service
+  const sessionSvc = yield* SpecialistSession.Service
+  const conversation = yield* SpecialistConversation.Service
+
+  const sessionID = yield* sessionSvc.create(input.specialist, input.specialist.executionPriority)
+
+  if (input.modelAssignment?.primary) {
+    yield* sessionSvc.assignModel(sessionID, input.modelAssignment.primary, input.modelAssignment.fallback)
+  }
+
+  yield* sessionSvc.updateStatus(sessionID, "preparing")
 
   const cacheKey = `specialist:${input.specialist.id}:${input.taskType}` as const
 
@@ -52,7 +75,8 @@ const execute: Interface["execute"] = Effect.fn("SpecialistRuntime.execute")(fun
   if (cachedValue) {
     const cached: SpecialistResult = JSON.parse(cachedValue) as SpecialistResult
     const runtimeResult = fromSpecialistResult(cached, { attempt: 1, cacheHit: true })
-    return { runtimeResult, specialistResult: cached, cached: true, attempts: 1 }
+    yield* sessionSvc.updateStatus(sessionID, "completed")
+    return { runtimeResult, specialistResult: cached, cached: true, attempts: 1, sessionID, cloudExecuted: false, budgetRemaining: true }
   }
 
   const prompt = yield* promptBuilder.buildPrompt(
@@ -62,11 +86,24 @@ const execute: Interface["execute"] = Effect.fn("SpecialistRuntime.execute")(fun
     input.taskObjective,
   )
 
+  yield* sessionSvc.updateStatus(sessionID, "executing")
+
   const maxAttempts = 3
   let lastResult: SpecialistResult | undefined
   let lastError: string | undefined
+  let cloudExecuted = false
+  let budgetRemaining = true
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    budgetRemaining = yield* budget.hasBudget("timeMs")
+    if (!budgetRemaining) {
+      yield* sessionSvc.addMessage(sessionID, {
+        id: `sys-${Date.now()}`, from: "system", to: input.specialist.id,
+        type: "warning", content: "execution budget exceeded", timestamp: Date.now(), confidence: undefined,
+      })
+      break
+    }
+
     const result = yield* executor.execute({
       specialist: input.specialist,
       taskObjective: prompt.userPrompt,
@@ -80,6 +117,8 @@ const execute: Interface["execute"] = Effect.fn("SpecialistRuntime.execute")(fun
 
     if (result._tag === "Right") {
       lastResult = result.right
+      cloudExecuted = result.right.metadata["cloud-executed"] === "true"
+
       const validation = yield* validator.validate(
         fromSpecialistResult(result.right, { attempt, cacheHit: false }),
         input.specialist.preferredKnowledge,
@@ -88,14 +127,22 @@ const execute: Interface["execute"] = Effect.fn("SpecialistRuntime.execute")(fun
       if (validation.valid) {
         yield* cache.put(cacheKey, JSON.stringify(result.right))
         const runtimeResult = fromSpecialistResult(result.right, { attempt, cacheHit: false })
-        return { runtimeResult, specialistResult: result.right, cached: false, attempts: attempt }
+        yield* sessionSvc.addKnowledge(sessionID, {
+          id: `k-${Date.now()}`, type: "execution-result", content: JSON.stringify(result.right),
+          source: input.specialist.id, confidence: result.right.confidence,
+          timestamp: Date.now(), owner: input.specialist.id,
+          provenance: [], dependencies: [],
+        })
+        yield* sessionSvc.updateStatus(sessionID, "completed")
+        yield* budget.consumeTime(result.right.executionTime)
+        return { runtimeResult, specialistResult: result.right, cached: false, attempts: attempt, sessionID, cloudExecuted, budgetRemaining }
       }
 
       if (attempt < maxAttempts) {
         const fallbackDecision = yield* fallback.decide(
           fromSpecialistResult(result.right, { attempt, cacheHit: false }),
           {
-            backupModel: undefined,
+            backupModel: input.modelAssignment?.fallback,
             attempts: attempt,
             maxAttempts,
           },
@@ -103,19 +150,31 @@ const execute: Interface["execute"] = Effect.fn("SpecialistRuntime.execute")(fun
 
         if (!fallbackDecision.shouldRetry) {
           const runtimeResult = fromSpecialistResult(result.right, { attempt, cacheHit: false })
-          return { runtimeResult, specialistResult: result.right, cached: false, attempts: attempt }
+          yield* sessionSvc.addMessage(sessionID, {
+            id: `fb-${Date.now()}`, from: "system", to: input.specialist.id,
+            type: "warning", content: fallbackDecision.reason,
+            timestamp: Date.now(), confidence: undefined,
+          })
+          yield* sessionSvc.updateStatus(sessionID, "completed")
+          yield* budget.consumeTime(result.right.executionTime)
+          return { runtimeResult, specialistResult: result.right, cached: false, attempts: attempt, sessionID, cloudExecuted, budgetRemaining }
         }
+
+        yield* budget.incrementRetries()
       }
     } else {
       lastError = result.left.message
+      yield* budget.incrementRetries()
     }
   }
 
   if (lastResult) {
     const runtimeResult = fromSpecialistResult(lastResult, { attempt: maxAttempts, cacheHit: false })
-    return { runtimeResult, specialistResult: lastResult, cached: false, attempts: maxAttempts }
+    yield* sessionSvc.updateStatus(sessionID, "failed")
+    return { runtimeResult, specialistResult: lastResult, cached: false, attempts: maxAttempts, sessionID, cloudExecuted, budgetRemaining }
   }
 
+  yield* sessionSvc.updateStatus(sessionID, "failed")
   return yield* Effect.die(new Error(lastError ?? "Specialist execution failed after max attempts"))
 })
 
