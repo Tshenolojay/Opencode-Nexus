@@ -472,7 +472,7 @@ const layer = Layer.effect(
       AgentContextService.layer,
       AgentHintsService.layer,
       AgentCapabilitiesService.layer,
-      AgentSelectionAdviceService.layer,
+      AgentSelectionAdviceService.layer.pipe(Layer.provideMerge(AgentCapabilitiesService.layer)),
       PromptAugmentationService.layer,
       AgentEnhancer.layer,
       AgentAdapter.layer,
