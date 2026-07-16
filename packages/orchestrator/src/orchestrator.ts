@@ -555,10 +555,10 @@ const layer = Layer.effect(
       ExecutionScheduler.layer.pipe(Layer.provideMerge(SpecialistRegistry.layer)),
       VirtualTeam.layer.pipe(Layer.provideMerge(SpecialistRegistry.layer)),
       ReviewPipelineService.layer.pipe(Layer.provideMerge(SpecialistRegistry.layer)),
-      PeerReviewEngine.layer.pipe(Layer.provideMerge(SpecialistRegistry.layer)),
+      PeerReviewEngine.layer.pipe(Layer.provideMerge(Layer.mergeAll(SpecialistRegistry.layer, SpecialistConversation.layer))),
       DecisionEngine.layer.pipe(Layer.provideMerge(ReasoningMemory.layer)),
       ConflictResolution.layer.pipe(Layer.provideMerge(SpecialistConsensus.layer)),
-      DiscussionModerator.layer.pipe(Layer.provideMerge(TeamDiscussionEngine.layer)),
+      DiscussionModerator.layer.pipe(Layer.provideMerge(Layer.mergeAll(TeamDiscussionEngine.layer, SpecialistConversation.layer))),
       KnowledgeConnector.layer.pipe(
             Layer.provideMerge(Layer.mergeAll(RepositoryConnector.layer, DocumentationConnector.layer, ConversationConnector.layer, ToolHistoryConnector.layer)),
           ),
@@ -602,7 +602,7 @@ const layer = Layer.effect(
             Layer.provideMerge(Layer.mergeAll(SpecialistConsensus.layer, CollaborationPolicy.layer)),
           ),
       SpecialistCoordinator.layer.pipe(
-            Layer.provideMerge(Layer.mergeAll(SpecialistRegistry.layer, SpecialistScoreboard.layer)),
+            Layer.provideMerge(Layer.mergeAll(SpecialistRegistry.layer, SpecialistScoreboard.layer, SpecialistConversation.layer)),
           ),
       SelectionEngine.layer.pipe(
             Layer.provideMerge(Layer.mergeAll(CapabilityMatcher.layer, ResourceEstimator.layer, ProviderHealth.layer, ProviderAvailability.layer, BenchmarkStore.layer, PerformanceMemory.layer, PreferenceManager.layer, RoutingPolicy.layer, FallbackEngine.layer, ModelCatalog.layer, ProviderCatalog.layer)),
