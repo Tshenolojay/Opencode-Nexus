@@ -2,8 +2,22 @@
 
 import { Script } from "@opencode-ai/script"
 import { $ } from "bun"
+import path from "path"
+import semver from "semver"
 
-const output = [`version=${Script.version}`]
+const opencodePackage = await Bun.file(path.resolve(import.meta.dir, "../packages/opencode/package.json")).json()
+const opencodeVersion = opencodePackage.version as string
+
+const branch = await $`git branch --show-current`.text().then((x) => x.trim())
+const version =
+  process.env.OPENCODE_VERSION ??
+  (branch === "main" && !process.env.OPENCODE_BUMP
+    ? opencodeVersion
+    : process.env.OPENCODE_BUMP
+      ? semver.inc(opencodeVersion, process.env.OPENCODE_BUMP.toLowerCase() as semver.ReleaseType) ?? opencodeVersion
+      : Script.version)
+
+const output = [`version=${version}`]
 const sha = process.env.GITHUB_SHA ?? (await $`git rev-parse HEAD`.text()).trim()
 
 if (!Script.preview) {
